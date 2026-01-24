@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring AI Function-Calling Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 25px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .header-btn {
+            padding: 8px 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .session-info {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 8px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .session-info span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f7f9fc;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.ai .message-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .message-info {
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.7;
+        }
+
+        .function-badge {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #messageInput:focus {
+            border-color: #667eea;
+        }
+
+        #sendButton {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #sendButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #sendButton:active {
+            transform: translateY(0);
+        }
+
+        #sendButton:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            color: #667eea;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .dot-pulse {
+            display: inline-block;
+            position: relative;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background-color: #667eea;
+            animation: dotPulse 1.5s infinite ease-in-out;
+        }
+
+        .dot-pulse::before,
+        .dot-pulse::after {
+            content: '';
+            display: inline-block;
+            position: absolute;
+            top: 0;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background-color: #667eea;
+        }
+
+        .dot-pulse::before {
+            left: -15px;
+            animation: dotPulseBefore 1.5s infinite ease-in-out;
+        }
+
+        .dot-pulse::after {
+            left: 15px;
+            animation: dotPulseAfter 1.5s infinite ease-in-out;
+        }
+
+        @keyframes dotPulse {
+            0%, 80%, 100% { opacity: 1; }
+            40% { opacity: 0.5; }
+        }
+
+        @keyframes dotPulseBefore {
+            0%, 80%, 100% { opacity: 0.5; }
+            40% { opacity: 1; }
+        }
+
+        @keyframes dotPulseAfter {
+            0%, 40%, 100% { opacity: 0.5; }
+            80% { opacity: 1; }
+        }
+
+        .examples {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+
+        .examples h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .example-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .example-btn {
+            padding: 8px 15px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div>
+            <h1>🤖 Spring AI Chat</h1>
+            <p>AWS Bedrock Claude Sonnet 4.5 with Function-Calling</p>
+                </div>
+                <div class="header-controls">
+                    <button class="header-btn" onclick="clearConversation()" title="대화 초기화">🗑️ 초기화</button>
+                    <button class="header-btn" onclick="newSession()" title="새 세션 시작">🆕 새 세션</button>
+                </div>
+            </div>
+            <div class="session-info">
+                <span>📊 대화 턴: <strong id="conversationTurn">0</strong></span>
+                <span>🔑 세션 ID: <strong id="sessionId">새 세션 생성 중...</strong></span>
+            </div>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="empty-state">
+                <div class="empty-state-icon">💬</div>
+                <p>안녕하세요! 웬즈데이입니다.<br>무엇을 도와드릴까요?</p>
+                <p style="margin-top: 10px; font-size: 12px; color: #aaa;">이전 대화를 기억하고 맥락을 유지합니다.</p>
+            </div>
+            <div class="examples">
+                <h3>💡 예시 질문</h3>
+                <div class="example-buttons">
+                    <button class="example-btn" onclick="sendExample('안녕! 웬즈데이')">안녕! 웬즈데이</button>
+                    <button class="example-btn" onclick="sendExample('서울 날씨 알려줘')">서울 날씨 알려줘</button>
+                    <button class="example-btn" onclick="sendExample('25 곱하기 48은?')">25 곱하기 48은?</button>
+                    <button class="example-btn" onclick="sendExample('그 결과에 10을 더하면?')">그 결과에 10을 더하면?</button>
+                    <button class="example-btn" onclick="sendExample('Spring AI에 대해 설명해줘')">Spring AI 설명</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <span class="dot-pulse"></span>
+            <p style="margin-top: 10px; font-size: 14px;">웬즈데이가 생각하는 중...</p>
+        </div>
+
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="메시지를 입력하세요... (이전 대화를 기억합니다)"
+                onkeypress="handleKeyPress(event)"
+            >
+            <button id="sendButton" onclick="sendMessage()">전송</button>
+        </div>
+    </div>
+
+    <script>
+        let isFirstMessage = true;
+        let currentSessionId = null;
+        let conversationTurn = 0;
+
+        // 페이지 로드 시 새 세션 생성
+        async function initializeSession() {
+            try {
+                const response = await fetch('/api/chat/session/new', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                currentSessionId = data.sessionId;
+                updateSessionInfo();
+                console.log('✅ 새 세션 생성:', currentSessionId);
+            } catch (error) {
+                console.error('❌ 세션 생성 실패:', error);
+                document.getElementById('sessionId').textContent = '오류';
+            }
+        }
+
+        function updateSessionInfo() {
+            const sessionIdShort = currentSessionId ? currentSessionId.substring(0, 8) + '...' : 'None';
+            document.getElementById('sessionId').textContent = sessionIdShort;
+            document.getElementById('conversationTurn').textContent = conversationTurn;
+        }
+
+        function addMessage(text, isUser, functionCalled = false) {
+            const chatContainer = document.getElementById('chatContainer');
+            
+            // 첫 메시지일 때 empty state 제거
+            if (isFirstMessage && isUser) {
+                chatContainer.innerHTML = '';
+                isFirstMessage = false;
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            bubbleDiv.textContent = text;
+            
+            if (!isUser && functionCalled) {
+                const badge = document.createElement('span');
+                badge.className = 'function-badge';
+                badge.textContent = '🔧 Function Called';
+                bubbleDiv.appendChild(badge);
+            }
+            
+            messageDiv.appendChild(bubbleDiv);
+            chatContainer.appendChild(messageDiv);
+            
+            // 스크롤을 맨 아래로
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            const sendButton = document.getElementById('sendButton');
+            const messageInput = document.getElementById('messageInput');
+            
+            if (show) {
+                loading.classList.add('active');
+                sendButton.disabled = true;
+                messageInput.disabled = true;
+            } else {
+                loading.classList.remove('active');
+                sendButton.disabled = false;
+                messageInput.disabled = false;
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // 세션이 없으면 생성
+            if (!currentSessionId) {
+                await initializeSession();
+            }
+            
+            // 사용자 메시지 추가
+            addMessage(message, true);
+            input.value = '';
+            
+            // 로딩 표시
+            showLoading(true);
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        message: message,
+                        sessionId: currentSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // AI 응답 추가
+                addMessage(data.response, false, data.functionCalled);
+                
+                // 세션 정보 업데이트
+                currentSessionId = data.sessionId;
+                conversationTurn = data.conversationTurn;
+                updateSessionInfo();
+                
+                console.log('✅ 응답 받음:', {
+                    sessionId: data.sessionId,
+                    turn: data.conversationTurn,
+                    functionCalled: data.functionCalled
+                });
+                
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('❌ 오류가 발생했습니다: ' + error.message, false);
+            } finally {
+                showLoading(false);
+                input.focus();
+            }
+        }
+
+        async function clearConversation() {
+            if (!currentSessionId) return;
+            
+            if (!confirm('대화 내용을 모두 초기화하시겠습니까?')) return;
+            
+            try {
+                await fetch(`/api/chat/session/${currentSessionId}/clear`, {
+                    method: 'DELETE'
+                });
+                
+                // UI 초기화
+                document.getElementById('chatContainer').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">💬</div>
+                        <p>대화가 초기화되었습니다.<br>새로운 대화를 시작하세요!</p>
+                    </div>
+                `;
+                
+                isFirstMessage = true;
+                conversationTurn = 0;
+                updateSessionInfo();
+                
+                console.log('✅ 대화 초기화됨:', currentSessionId);
+                
+            } catch (error) {
+                console.error('❌ 초기화 실패:', error);
+                alert('대화 초기화에 실패했습니다.');
+            }
+        }
+
+        async function newSession() {
+            if (conversationTurn > 0 && !confirm('현재 대화를 종료하고 새 세션을 시작하시겠습니까?')) {
+                return;
+            }
+            
+            // UI 초기화
+            document.getElementById('chatContainer').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🆕</div>
+                    <p>새로운 세션을 시작합니다!</p>
+                </div>
+            `;
+            
+            isFirstMessage = true;
+            conversationTurn = 0;
+            currentSessionId = null;
+            
+            // 새 세션 생성
+            await initializeSession();
+            
+            console.log('✅ 새 세션 시작:', currentSessionId);
+        }
+
+        function sendExample(text) {
+            document.getElementById('messageInput').value = text;
+            sendMessage();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // 페이지 로드 시 세션 생성 및 입력창에 포커스
+        window.onload = function() {
+            initializeSession();
+            document.getElementById('messageInput').focus();
+        };
+    </script>
+</body>
+</html>
