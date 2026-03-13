@@ -1,0 +1,14 @@
+# Oh My Zsh 설정 후 이 내용을 ~/.zshrc 파일 맨 아래에 추가하세요
+
+# ============================================
+# Java 17
+# ============================================
+export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+
+# ============================================
+# AWS Credentials for Bedrock
+# ============================================
+export AWS_ACCESS_KEY_ID="AKIAYZE6FEL4NBCDAU4F"
+export AWS_SECRET_ACCESS_KEY="N4CIRbJOriF1bKb+Hp9jOT2/xT4Qg3mG9IwEfg0"
+export AWS_REGION="ap-northeast-2"
